@@ -12,7 +12,19 @@ const CopyWebpackPlugin = require('copy-webpack-plugin');
 const TerserPlugin = require('terser-webpack-plugin');
 const packageJson = require('./package.json');
 
-const COMMIT_HASH = execSync('git rev-parse HEAD').toString().trim();
+const resolveCommitHash = () => {
+    if (typeof process.env.STREMIO_WEB_COMMIT_HASH === 'string' && process.env.STREMIO_WEB_COMMIT_HASH.length > 0) {
+        return process.env.STREMIO_WEB_COMMIT_HASH;
+    }
+
+    try {
+        return execSync('git rev-parse HEAD', { stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim();
+    } catch (error) {
+        return 'local-build';
+    }
+};
+
+const COMMIT_HASH = resolveCommitHash();
 
 const THREAD_LOADER = {
     loader: 'thread-loader',
@@ -33,13 +45,21 @@ threadLoader.warmup(
     ],
 );
 
-module.exports = (env, argv) => ({
-    mode: argv.mode,
-    devtool: argv.mode === 'production' ? 'source-map' : 'eval-source-map',
-    entry: {
+module.exports = (env, argv) => {
+    const entry = {
         main: './src/index.js',
         worker: './node_modules/@stremio/stremio-core-web/worker.js'
-    },
+    };
+
+    const useLocalStorageLoader = process.env.STREMIO_WEB_USE_LOCALSTORAGE_LOADER === '1' || env?.localStorageLoader === true;
+    if (useLocalStorageLoader) {
+        entry.loader = './src/load_localStorage.js';
+    }
+
+    return {
+    mode: argv.mode,
+    devtool: argv.mode === 'production' ? 'source-map' : 'eval-source-map',
+    entry,
     output: {
         path: path.join(__dirname, 'build'),
         filename: `${COMMIT_HASH}/scripts/[name].js`,
@@ -246,4 +266,5 @@ module.exports = (env, argv) => ({
             imagesPath: 'images',
         }),
     ].filter(Boolean)
-});
+    };
+};

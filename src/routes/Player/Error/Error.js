@@ -8,7 +8,7 @@ const { default: Icon } = require('@stremio/stremio-icons/react');
 const { Button } = require('stremio/components');
 const styles = require('./styles');
 
-const Error = React.forwardRef(({ className, code, message, stream }, ref) => {
+const Error = React.forwardRef(({ className, code, message, stream, backToStreamsLabel, onBackToStreams }, ref) => {
     const { t } = useTranslation();
 
     const [playlist, fileName] = React.useMemo(() => {
@@ -27,21 +27,36 @@ const Error = React.forwardRef(({ className, code, message, stream }, ref) => {
                     :
                     null
             }
-            {
-                playlist && fileName ?
-                    <Button
-                        className={styles['playlist-button']}
-                        title={t('PLAYER_OPEN_IN_EXTERNAL')}
-                        href={playlist}
-                        download={fileName}
-                        target={'_blank'}
-                    >
-                        <Icon className={styles['icon']} name={'ic_downloads'} />
-                        <div className={styles['label']}>{t('PLAYER_OPEN_IN_EXTERNAL')}</div>
-                    </Button>
-                    :
-                    null
-            }
+            <div className={styles['actions']}>
+                {
+                    playlist && fileName ?
+                        <Button
+                            className={styles['playlist-button']}
+                            title={t('PLAYER_OPEN_IN_EXTERNAL')}
+                            href={playlist}
+                            download={fileName}
+                            target={'_blank'}
+                        >
+                            <Icon className={styles['icon']} name={'ic_downloads'} />
+                            <div className={styles['label']}>{t('PLAYER_OPEN_IN_EXTERNAL')}</div>
+                        </Button>
+                        :
+                        null
+                }
+                {
+                    typeof onBackToStreams === 'function' ?
+                        <Button
+                            className={styles['back-button']}
+                            title={backToStreamsLabel}
+                            onClick={onBackToStreams}
+                        >
+                            <Icon className={styles['icon']} name={'chevron-back'} />
+                            <div className={styles['label']}>{backToStreamsLabel}</div>
+                        </Button>
+                        :
+                        null
+                }
+            </div>
         </div>
     );
 });
@@ -51,6 +66,8 @@ Error.propTypes = {
     code: PropTypes.number,
     message: PropTypes.string,
     stream: PropTypes.object,
+    backToStreamsLabel: PropTypes.string,
+    onBackToStreams: PropTypes.func,
 };
 
 module.exports = Error;

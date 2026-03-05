@@ -42,12 +42,16 @@ const useStatistics = (player, streamingServer) => {
             0;
     }, [statistics]);
 
-    const completed = React.useMemo(() => {
-        return statistics?.streamProgress ?
-            parseFloat((statistics.streamProgress * 100).toFixed(2))
+    const progress = React.useMemo(() => {
+        return typeof statistics?.streamProgress === 'number' ?
+            statistics.streamProgress
             :
             0;
     }, [statistics]);
+
+    const completed = React.useMemo(() => {
+        return parseFloat((progress * 100).toFixed(2));
+    }, [progress]);
 
     const getStatistics = React.useCallback(() => {
         if (stream) {
@@ -77,6 +81,7 @@ const useStatistics = (player, streamingServer) => {
         infoHash,
         peers,
         speed,
+        progress,
         completed,
     };
 };

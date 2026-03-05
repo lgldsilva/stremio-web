@@ -31,13 +31,17 @@ const { default: Indicator } = require('./Indicator/Indicator');
 
 const findTrackByLang = (tracks, lang) => tracks.find((track) => track.lang === lang || langs.where('1', track.lang)?.[2] === lang);
 const findTrackById = (tracks, id) => tracks.find((track) => track.id === id);
+const TORRENT_DEAD_TIMEOUT_MS = 30000;
+const TORRENT_DEAD_PROGRESS_THRESHOLD = 0.01;
+const TORRENT_WITHOUT_SEEDERS_ERROR_CODE = 1001;
 
 const Player = ({ urlParams, queryParams }) => {
     const { t } = useTranslation();
     const services = useServices();
     const shell = useShell();
     const forceTranscoding = React.useMemo(() => {
-        return queryParams.has('forceTranscoding');
+        const rawValue = queryParams.get('forceTranscoding');
+        return queryParams.has('forceTranscoding') && rawValue !== '0' && rawValue !== 'false';
     }, [queryParams]);
     const profile = useProfile();
     const [player, videoParamsChanged, streamStateChanged, timeChanged, seek, pausedChanged, ended, nextVideo] = usePlayer(urlParams);
@@ -92,6 +96,21 @@ const Player = ({ urlParams, queryParams }) => {
     const defaultSubtitlesSelected = React.useRef(false);
     const subtitlesEnabled = React.useRef(true);
     const defaultAudioTrackSelected = React.useRef(false);
+    const noSeedersErrorShownRef = React.useRef(false);
+    const errorStateRef = React.useRef(null);
+    const deadTorrentWindowRef = React.useRef({
+        infoHash: null,
+        startedAt: null,
+    });
+    const torrentProbeRef = React.useRef({
+        infoHash: null,
+        peers: 0,
+        speed: 0,
+        progress: 0,
+        stream: null,
+        paused: null,
+        time: null,
+    });
     const [error, setError] = React.useState(null);
 
     const isNavigating = React.useRef(false);
@@ -103,6 +122,18 @@ const Player = ({ urlParams, queryParams }) => {
         video.setSubtitlesBackgroundColor(settings.subtitlesBackgroundColor);
         video.setSubtitlesOutlineColor(settings.subtitlesOutlineColor);
     }, [settings]);
+
+    const torrentWithoutSeedersMessage = React.useMemo(() => {
+        return t('PLAYER_TORRENT_NO_SEEDERS', {
+            defaultValue: 'Torrent has no active seeders'
+        });
+    }, [t]);
+
+    const backToStreamsLabel = React.useMemo(() => {
+        return t('PLAYER_BACK_TO_STREAMS', {
+            defaultValue: 'Back to stream list'
+        });
+    }, [t]);
 
     const handleNextVideoNavigation = React.useCallback((deepLinks, bingeWatching, ended) => {
         if (ended) {
@@ -295,6 +326,10 @@ const Player = ({ urlParams, queryParams }) => {
         }
     }, [player.nextVideo, handleNextVideoNavigation, profile.settings]);
 
+    const onBackToStreams = React.useCallback(() => {
+        window.history.back();
+    }, []);
+
     const onVideoClick = React.useCallback(() => {
         if (video.state.paused !== null) {
             if (video.state.paused) {
@@ -355,6 +390,11 @@ const Player = ({ urlParams, queryParams }) => {
 
     React.useEffect(() => {
         setError(null);
+        noSeedersErrorShownRef.current = false;
+        deadTorrentWindowRef.current = {
+            infoHash: null,
+            startedAt: null,
+        };
         video.unload();
 
         if (player.selected && player.stream?.type === 'Ready' && streamingServer.settings?.type !== 'Loading') {
@@ -507,10 +547,101 @@ const Player = ({ urlParams, queryParams }) => {
         defaultSubtitlesSelected.current = false;
         defaultAudioTrackSelected.current = false;
         nextVideoPopupDismissed.current = false;
+        noSeedersErrorShownRef.current = false;
+        deadTorrentWindowRef.current = {
+            infoHash: null,
+            startedAt: null,
+        };
         // we need a timeout here to make sure that previous page unloads and the new one loads
         // avoiding race conditions and flickering
         setTimeout(() => isNavigating.current = false, 1000);
     }, [video.state.stream]);
+
+    React.useEffect(() => {
+        errorStateRef.current = error;
+    }, [error]);
+
+    React.useEffect(() => {
+        torrentProbeRef.current = {
+            infoHash: statistics.infoHash,
+            peers: statistics.peers,
+            speed: statistics.speed,
+            progress: statistics.progress,
+            stream: video.state.stream,
+            paused: video.state.paused,
+            time: video.state.time,
+        };
+    }, [
+        statistics.infoHash,
+        statistics.peers,
+        statistics.speed,
+        statistics.progress,
+        video.state.stream,
+        video.state.paused,
+        video.state.time,
+    ]);
+
+    React.useEffect(() => {
+        const checkDeadTorrent = () => {
+            if (errorStateRef.current !== null || noSeedersErrorShownRef.current) {
+                return;
+            }
+
+            const probe = torrentProbeRef.current;
+
+            if (probe.stream === null || probe.paused === true) {
+                return;
+            }
+
+            if (typeof probe.infoHash !== 'string' || probe.infoHash.length === 0) {
+                deadTorrentWindowRef.current = {
+                    infoHash: null,
+                    startedAt: null,
+                };
+                return;
+            }
+
+            if (typeof probe.time === 'number' && probe.time > 5) {
+                return;
+            }
+
+            const deadTorrentWindow = deadTorrentWindowRef.current;
+            if (deadTorrentWindow.infoHash !== probe.infoHash) {
+                deadTorrentWindowRef.current = {
+                    infoHash: probe.infoHash,
+                    startedAt: Date.now(),
+                };
+                return;
+            }
+
+            if (typeof deadTorrentWindow.startedAt !== 'number') {
+                deadTorrentWindow.startedAt = Date.now();
+                return;
+            }
+
+            if ((Date.now() - deadTorrentWindow.startedAt) < TORRENT_DEAD_TIMEOUT_MS) {
+                return;
+            }
+
+            if (probe.peers <= 0 && probe.speed <= 0.01 && probe.progress < TORRENT_DEAD_PROGRESS_THRESHOLD) {
+                noSeedersErrorShownRef.current = true;
+                video.setPaused(true);
+                setError({
+                    critical: true,
+                    code: TORRENT_WITHOUT_SEEDERS_ERROR_CODE,
+                    message: torrentWithoutSeedersMessage,
+                    showBackToStreams: true,
+                });
+            }
+        };
+
+        checkDeadTorrent();
+        const interval = setInterval(checkDeadTorrent, 5000);
+
+        return () => {
+            clearInterval(interval);
+        };
+    }, [torrentWithoutSeedersMessage]);
 
     React.useEffect(() => {
         if ((!Array.isArray(video.state.subtitlesTracks) || video.state.subtitlesTracks.length === 0) &&
@@ -814,6 +945,8 @@ const Player = ({ urlParams, queryParams }) => {
                         ref={errorRef}
                         className={classnames(styles['layer'], styles['error-layer'])}
                         stream={video.state.stream}
+                        backToStreamsLabel={backToStreamsLabel}
+                        onBackToStreams={error.showBackToStreams ? onBackToStreams : null}
                         {...error}
                     />
                     :

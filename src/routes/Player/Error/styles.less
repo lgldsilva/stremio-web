@@ -28,14 +28,23 @@
         text-align: center;            
     }
 
-    .playlist-button {
+    .actions {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: center;
+        gap: 1rem;
+        margin-top: 1.5rem;
+    }
+
+    .playlist-button,
+    .back-button {
         flex: none;
         display: flex;
         flex-direction: row;
         align-items: center;
         height: 3.5rem;
         border-radius: 3.5rem;
-        margin-top: 1.5rem;
         padding: 0 2rem;
         background-color: var(--secondary-accent-color);
 

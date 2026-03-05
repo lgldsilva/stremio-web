@@ -37,6 +37,38 @@ docker build -t stremio-web .
 docker run -p 8080:8080 stremio-web
 ```
 
+### All-in-One Docker (Web + Server + ffmpeg)
+
+This repository now includes a full Docker stack under `docker/` with:
+- Web UI + stremio-server in one container
+- Dynamic hardware backend selection (`auto`, `none`, `vaapi`, `nvidia`)
+- HTTPS helpers, optional basic auth, and runtime tuning
+
+Use from the project root:
+
+```bash
+cp docker/.env.example docker/.env
+# edit docker/.env only if you need custom values
+docker compose --env-file docker/.env -f docker/compose.simple.yaml up -d --build
+```
+
+NVIDIA variant:
+
+```bash
+docker compose --env-file docker/.env -f docker/compose.nvidia.yaml up -d --build
+```
+
+Important envs:
+- `HWACCEL_BACKEND=auto|none|vaapi|nvidia`
+- `STREMIO_PUBLIC_URL=https://your-domain/`
+- `STREMIO_PUBLIC_HOST` and `STREMIO_HOST_IP` for container DNS (required when `.lan` is not resolvable inside container)
+- `STREMIO_IPADDRESS=` (leave empty when using reverse proxy TLS)
+- `NVIDIA_COMPAT_PATCH=1` (default)
+
+Notes:
+- If there is no GPU, keep `HWACCEL_BACKEND=auto` and it falls back to CPU (`none`) automatically.
+- For Intel/AMD VAAPI, use `compose.simple.yaml` and expose `/dev/dri` in the service.
+
 ## Screenshots
 
 ### Board

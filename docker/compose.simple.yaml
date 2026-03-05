@@ -1,0 +1,24 @@
+services:
+  stremio:
+    build:
+      context: ..
+      dockerfile: ${STREMIO_DOCKERFILE:-docker/Dockerfile}
+    image: local/stremio-web-allinone:latest
+    restart: unless-stopped
+    environment:
+      - NO_CORS=${NO_CORS:-1}
+      - AUTO_SERVER_URL=${STREMIO_AUTO_SERVER_URL:-0}
+      - IPADDRESS=${STREMIO_IPADDRESS:-}
+      - SERVER_URL=${STREMIO_PUBLIC_URL:-https://stremio.raspberrypi.lan/}
+      - WEBUI_INTERNAL_PORT=${WEBUI_INTERNAL_PORT:-8080}
+      - HWACCEL_BACKEND=${HWACCEL_BACKEND:-auto}
+      - NVIDIA_COMPAT_PATCH=${NVIDIA_COMPAT_PATCH:-1}
+    ports:
+      - "${STREMIO_HTTP_PORT:-8085}:${WEBUI_INTERNAL_PORT:-8080}"
+    extra_hosts:
+      - "${STREMIO_PUBLIC_HOST:-stremio.raspberrypi.lan}:${STREMIO_HOST_IP:-host-gateway}"
+    volumes:
+      - ./stremio-data:/root/.stremio-server
+    # Para Intel/AMD VAAPI, descomente:
+    # devices:
+    #   - "/dev/dri:/dev/dri"
