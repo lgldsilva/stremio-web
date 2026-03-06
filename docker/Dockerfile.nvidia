@@ -65,8 +65,9 @@ COPY . /srv/stremio-web
 ENV STREMIO_WEB_USE_LOCALSTORAGE_LOADER=1
 RUN pnpm run build
 
-RUN wget "$(wget -O- https://raw.githubusercontent.com/Stremio/stremio-shell/master/server-url.txt)" && \
-    wget -mkEpnp -nH "https://app.strem.io/" "https://app.strem.io/worker.js" "https://app.strem.io/images/stremio.png" "https://app.strem.io/images/empty.png" -P build/shell/ || true
+# O server.js agora é fornecido localmente na pasta docker/
+# RUN wget "$(wget -O- https://raw.githubusercontent.com/Stremio/stremio-shell/master/server-url.txt)" && \
+#    wget -mkEpnp -nH "https://app.strem.io/" "https://app.strem.io/worker.js" "https://app.strem.io/images/stremio.png" "https://app.strem.io/images/empty.png" -P build/shell/ || true
 
 FROM nvidia/cuda:12.2.2-runtime-ubuntu22.04 AS final
 
@@ -97,7 +98,7 @@ RUN useradd -r -s /bin/false nginx && \
 
 WORKDIR /srv/stremio-server
 COPY --from=builder-web /srv/stremio-web/build ./build
-COPY --from=builder-web /srv/stremio-web/server.js ./
+COPY docker/server.js ./server.js
 
 COPY docker/nginx/ /etc/nginx/
 COPY docker/stremio-web-service-run.sh ./
