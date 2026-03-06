@@ -12,7 +12,11 @@ const { useRouteFocused } = require('stremio-router');
 const StreamPlaceholder = require('./StreamPlaceholder');
 const styles = require('./styles');
 
-const Stream = ({ className, videoId, videoReleased, addonName, name, description, thumbnail, progress, deepLinks, ...props }) => {
+const torrentClientConfigCache = { fetched: false, enabled: false, clientType: '' };
+
+const CONTENT_TYPE_FOLDER = { movie: 'movies', series: 'series' };
+
+const Stream = ({ className, videoId, videoReleased, addonName, name, description, thumbnail, progress, deepLinks, infoHash, sources, contentType, ...props }) => {
     const profile = useProfile();
     const toast = useToast();
     const platform = usePlatform();
@@ -20,6 +24,26 @@ const Stream = ({ className, videoId, videoReleased, addonName, name, descriptio
     const routeFocused = useRouteFocused();
 
     const [menuOpen, , closeMenu, toggleMenu] = useBinaryState(false);
+    const [torrentClientEnabled, setTorrentClientEnabled] = React.useState(torrentClientConfigCache.enabled);
+    const [torrentClientType, setTorrentClientType] = React.useState(torrentClientConfigCache.clientType);
+
+    const isTorrentStream = typeof infoHash === 'string' && infoHash.length > 0;
+
+    React.useEffect(() => {
+        if (torrentClientConfigCache.fetched) return;
+        fetch('/api/torrent/config')
+            .then((res) => res.ok ? res.json() : null)
+            .then((data) => {
+                torrentClientConfigCache.fetched = true;
+                if (data && data.enabled) {
+                    torrentClientConfigCache.enabled = true;
+                    torrentClientConfigCache.clientType = data.clientType || '';
+                    setTorrentClientEnabled(true);
+                    setTorrentClientType(data.clientType || '');
+                }
+            })
+            .catch(() => { torrentClientConfigCache.fetched = true; });
+    }, []);
 
     const popupLabelOnMouseUp = React.useCallback((event) => {
         if (!event.nativeEvent.togglePopupPrevented) {
@@ -164,6 +188,68 @@ const Stream = ({ className, videoId, videoReleased, addonName, name, descriptio
         }
     }, [streamLink]);
 
+    const queueLabel = React.useMemo(() => {
+        if (!torrentClientType) return '';
+        const clientName = torrentClientType.charAt(0).toUpperCase() + torrentClientType.slice(1);
+        return t('TORRENT_QUEUE_DOWNLOAD', { defaultValue: `Queue in ${clientName}`, client: clientName });
+    }, [torrentClientType]);
+
+    const onQueueDownload = React.useCallback((event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        if (!infoHash) return;
+
+        const params = [`xt=urn:btih:${infoHash}`];
+        const displayName = description ? description.split('\n')[0].trim() : name;
+        if (displayName) params.push(`dn=${encodeURIComponent(displayName)}`);
+        if (Array.isArray(sources)) {
+            sources.forEach((src) => {
+                if (typeof src === 'string' && src.startsWith('tracker:')) {
+                    params.push(`tr=${encodeURIComponent(src.replace('tracker:', ''))}`);
+                }
+            });
+        }
+        const magnet = `magnet:?${params.join('&')}`;
+
+        const body = { magnet };
+        const subfolder = CONTENT_TYPE_FOLDER[contentType];
+        if (subfolder) body.downloadSubfolder = subfolder;
+
+        fetch('/api/torrent/add', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+        })
+            .then((res) => res.json())
+            .then((data) => {
+                if (data.result === 'success' || data.arguments) {
+                    const added = data.arguments?.['torrent-added'] || data.arguments?.['torrent-duplicate'];
+                    toast.show({
+                        type: 'success',
+                        title: t('TORRENT_QUEUED', { defaultValue: 'Download queued' }),
+                        message: added?.name || name || infoHash,
+                        timeout: 4000,
+                    });
+                } else {
+                    throw new Error(data.error || 'Unknown error');
+                }
+            })
+            .catch((e) => {
+                toast.show({
+                    type: 'error',
+                    title: t('ERROR'),
+                    message: e.message,
+                    timeout: 4000,
+                });
+            });
+    }, [infoHash, name, description, sources, contentType, toast]);
+
+    const onQueueDownloadKeyDown = React.useCallback((event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+            onQueueDownload(event);
+        }
+    }, [onQueueDownload]);
+
     const renderThumbnailFallback = React.useCallback(() => (
         <Icon className={styles['placeholder-icon']} name={'ic_broken_link'} />
     ), []);
@@ -198,11 +284,28 @@ const Stream = ({ className, videoId, videoReleased, addonName, name, descriptio
                     }
                 </div>
                 <div className={styles['description-container']} title={description}>{description}</div>
-                <Icon className={styles['icon']} name={'play'} />
+                <div className={styles['actions-container']}>
+                    {
+                        torrentClientEnabled && isTorrentStream ?
+                            <div
+                                className={styles['download-button']}
+                                title={queueLabel}
+                                role={'button'}
+                                tabIndex={0}
+                                onClick={onQueueDownload}
+                                onKeyDown={onQueueDownloadKeyDown}
+                            >
+                                <Icon className={styles['action-icon']} name={'download'} />
+                            </div>
+                            :
+                            null
+                    }
+                    <Icon className={styles['icon']} name={'play'} />
+                </div>
                 {children}
             </Button>
         );
-    }, [thumbnail, progress, addonName, name, description, href, target, download, onClick]);
+    }, [thumbnail, progress, addonName, name, description, href, target, download, onClick, torrentClientEnabled, isTorrentStream, queueLabel, onQueueDownload, onQueueDownloadKeyDown]);
 
     const renderMenu = React.useMemo(() => function renderMenu() {
         return (
@@ -228,9 +331,16 @@ const Stream = ({ className, videoId, videoReleased, addonName, name, descriptio
                             <div className={styles['context-menu-option-label']}>{t('CTX_COPY_VIDEO_DOWNLOAD_LINK')}</div>
                         </Button>
                 }
+                {
+                    torrentClientEnabled && isTorrentStream &&
+                        <Button className={styles['context-menu-option-container']} title={queueLabel} onClick={onQueueDownload}>
+                            <Icon className={styles['menu-icon']} name={'ic_downloads'} />
+                            <div className={styles['context-menu-option-label']}>{queueLabel}</div>
+                        </Button>
+                }
             </div>
         );
-    }, [copyStreamLink, onClick]);
+    }, [description, streamLink, downloadLink, copyStreamLink, copyDownloadLink, torrentClientEnabled, isTorrentStream, queueLabel, onQueueDownload]);
 
     React.useEffect(() => {
         if (!routeFocused) {
@@ -280,6 +390,9 @@ Stream.propTypes = {
             })
         })
     }),
+    infoHash: PropTypes.string,
+    sources: PropTypes.array,
+    contentType: PropTypes.string,
     onClick: PropTypes.func
 };
 

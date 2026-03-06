@@ -974,6 +974,7 @@ const Player = ({ urlParams, queryParams }) => {
                     playbackDevices={playbackDevices}
                     extraSubtitlesTracks={video.state.extraSubtitlesTracks}
                     selectedExtraSubtitlesTrackId={video.state.selectedExtraSubtitlesTrackId}
+                    contentType={player?.metaItem?.content?.type}
                 />
             </ContextMenu>
             <HorizontalNavBar
@@ -1113,6 +1114,7 @@ const Player = ({ urlParams, queryParams }) => {
                         playbackDevices={playbackDevices}
                         extraSubtitlesTracks={video.state.extraSubtitlesTracks}
                         selectedExtraSubtitlesTrackId={video.state.selectedExtraSubtitlesTrackId}
+                        contentType={player?.metaItem?.content?.type}
                     />
                     :
                     null

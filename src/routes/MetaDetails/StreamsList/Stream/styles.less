@@ -26,8 +26,10 @@
     }
 
     &:hover, &:focus, &:global(.selected) {
-        .icon {
+        .icon,
+        .download-button {
             opacity: 1;
+            pointer-events: auto;
         }
     }
 
@@ -100,6 +102,41 @@
         color: var(--primary-foreground-color);
     }
     
+    .actions-container {
+        flex: none;
+        display: flex;
+        flex-direction: row;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .download-button {
+        flex: none;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 3rem;
+        height: 3rem;
+        padding: 0.7rem;
+        border-radius: 50%;
+        opacity: 0;
+        color: var(--primary-foreground-color);
+        background-color: var(--secondary-accent-color);
+        cursor: pointer;
+        pointer-events: none;
+
+        &:focus, &:focus-visible {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .action-icon {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+    }
+
     .icon {
         flex: none;
         width: 3rem;

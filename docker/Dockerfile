@@ -85,6 +85,7 @@ RUN apk add --no-cache nginx apache2-utils
 COPY docker/nginx/ /etc/nginx/
 COPY docker/stremio-web-service-run.sh ./
 COPY docker/configure-server-runtime.js ./
+COPY docker/torrent-client-proxy.js ./
 COPY docker/certificate.js ./
 COPY docker/restart_if_idle.sh ./
 COPY docker/localStorage.json ./
@@ -117,6 +118,9 @@ ENV AUTO_SERVER_URL=0
 ENV HWACCEL_BACKEND=auto
 ENV HWACCEL_PROFILE=
 ENV NVIDIA_COMPAT_PATCH=1
+ENV TORRENT_CLIENT_URL=
+ENV TORRENT_CLIENT_TYPE=transmission
+ENV TORRENT_CLIENT_DOWNLOAD_DIR=
 
 COPY --from=ffmpeg /usr/bin/ffmpeg /usr/bin/ffprobe /usr/bin/
 COPY --from=ffmpeg /usr/lib/jellyfin-ffmpeg /usr/lib/

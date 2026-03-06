@@ -102,6 +102,7 @@ COPY --from=builder-web /srv/stremio-web/server.js ./
 COPY docker/nginx/ /etc/nginx/
 COPY docker/stremio-web-service-run.sh ./
 COPY docker/configure-server-runtime.js ./
+COPY docker/torrent-client-proxy.js ./
 COPY docker/certificate.js ./
 COPY docker/restart_if_idle.sh ./
 COPY docker/localStorage.json ./
@@ -134,6 +135,9 @@ ENV AUTO_SERVER_URL=0
 ENV HWACCEL_BACKEND=auto
 ENV HWACCEL_PROFILE=
 ENV NVIDIA_COMPAT_PATCH=1
+ENV TORRENT_CLIENT_URL=
+ENV TORRENT_CLIENT_TYPE=transmission
+ENV TORRENT_CLIENT_DOWNLOAD_DIR=
 
 ENV NVIDIA_VISIBLE_DEVICES=all
 ENV NVIDIA_DRIVER_CAPABILITIES=compute,video,utility

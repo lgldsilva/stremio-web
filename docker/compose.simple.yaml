@@ -13,12 +13,16 @@ services:
       - WEBUI_INTERNAL_PORT=${WEBUI_INTERNAL_PORT:-8080}
       - HWACCEL_BACKEND=${HWACCEL_BACKEND:-auto}
       - NVIDIA_COMPAT_PATCH=${NVIDIA_COMPAT_PATCH:-1}
+      - TORRENT_CLIENT_URL=${TORRENT_CLIENT_URL:-}
+      - TORRENT_CLIENT_TYPE=${TORRENT_CLIENT_TYPE:-transmission}
+      - TORRENT_CLIENT_DOWNLOAD_DIR=${TORRENT_CLIENT_DOWNLOAD_DIR:-}
     ports:
       - "${STREMIO_HTTP_PORT:-8085}:${WEBUI_INTERNAL_PORT:-8080}"
     extra_hosts:
       - "${STREMIO_PUBLIC_HOST:-stremio.raspberrypi.lan}:${STREMIO_HOST_IP:-host-gateway}"
     volumes:
       - ./stremio-data:/root/.stremio-server
+      - ${TORRENT_SHARED_DOWNLOADS:-/mnt/lvm1-storage/Downloads}:${TORRENT_CLIENT_DOWNLOAD_DIR:-/downloads}
     # Para Intel/AMD VAAPI, descomente:
     # devices:
     #   - "/dev/dri:/dev/dri"

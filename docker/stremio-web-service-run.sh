@@ -56,6 +56,9 @@ fi
 
 node configure-server-runtime.js
 
+node torrent-client-proxy.js &
+TORRENT_PROXY_PID=$!
+
 node server.js &
 SERVER_PID=$!
 
